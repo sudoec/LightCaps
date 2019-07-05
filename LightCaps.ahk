@@ -1,7 +1,4 @@
-﻿;#InstallKeybdHook
-;#InstallMouseHook
-;#WinActivateForce
-#UseHook
+﻿#UseHook
 #SingleInstance force
 #MaxHotkeysPerInterval 500
 #NoEnv
@@ -27,38 +24,32 @@ Menu, Tray, Icon,,, 1
 start:
 ;-----------------START-----------------
 global ColeMak:=1
-setTimer, windowWatch, 40
+SetTimer, mouseWatch, 40
 
-windowWatch:
-if WinActive("ahk_class VMUIFrame") {
-    if (!active) {
-        active := true
-        ; Coming out of suspend mode recreates the keyboard hook, giving
-        ; our hook priority over the remote desktop client's.
-        suspend on
-        Sleep 50
-        suspend off
-    }
-    else {
-        If (!MouseIsOver("ahk_class VMUIFrame")) {
-            active := false
-        }
-    }
+mouseWatch:
+if !WinActive("ahk_class VMUIFrame")
+    return
+MouseGetPos, xpos, ypos
+if(xpos!=xposLast || ypos!=yposLast){
+    xposLast:=xpos
+    yposLast:=ypos
+    status:=1
 }
-else {
-    active := false
+else{
+    status:=0
 }
+if(statusLast==1 && status==0){
+    suspend on
+    suspend off
+}
+statusLast:=status
 return
 
-MouseIsOver(WinTitle) {
-    MouseGetPos,,, Win
-    return WinExist(WinTitle . " ahk_id " . Win)
-}
 
 ;---------------CAPSLOCK--------------
 global CapsLock2, CapsLock, CapsLockD, HalfSleep
 
-Capslock::
+$*Capslock::
 ;Capslock:  Capslock 键状态标记，按下是1，松开是0
 ;Capslock2: 是否使用过 Capslock+ 功能标记，使用过会清除这个变量
 CapsLock2:=CapsLock:=1
@@ -146,7 +137,7 @@ while(GetKeyState("LWin","P"))
 {}
 ControlSend, , {LWin Up}, A
 return
-
+#IfWinActive
 
 ;----------------------------keys-set-start-----------------------------
 ;  KEY_TO_NAME := {"a":"a","b":"b","c":"c","d":"d","e":"e","f":"f","g":"g","h":"h","i":"i"
@@ -166,7 +157,6 @@ return
 ;  }
 
 #If CapsLock ;when capslock key press and hold
-
 ;--------------------------Universal shortcut-------------------------
 <!WheelUp::
 try
@@ -417,6 +407,12 @@ try
             Sleep, 20
         }
     }
+Capslock2:=""
+return
+
+RAlt::
+try
+    SetCapsLockState, % GetKeyState("CapsLock","T") ? "Off" : "On"
 Capslock2:=""
 return
 
