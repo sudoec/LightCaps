@@ -206,6 +206,18 @@ try
 Capslock2:=""
 Return
 
+t::
+try
+    SendInput, {PgUp}
+Capslock2:=""
+Return
+
+v::
+try
+    SendInput, {PgDn}
+Capslock2:=""
+Return
+
 w::
 try
     SendInput,{home}
