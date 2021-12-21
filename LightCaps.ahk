@@ -1,4 +1,4 @@
-﻿#UseHook
+﻿;#UseHook
 #SingleInstance force
 #MaxHotkeysPerInterval 500
 #NoEnv
@@ -128,6 +128,9 @@ k::e
 l::i
 `;::o
 n::k
+=::[
+[::'
+'::=
 #If
 ;#IfWinActive ahk_class Qt5QWindowIcon
 #IfWinActive ahk_exe VirtualBoxVM.exe
@@ -278,6 +281,26 @@ try
 Capslock2:=""
 Return
 
+2::
+try
+    WinActivate, ahk_class Shell_TrayWnd
+    SendInput,#^{left}
+    Sleep 100
+    SendInput,!{Esc}
+    Sleep 100
+Capslock2:=""
+Return
+
+3::
+try
+    WinActivate, ahk_class Shell_TrayWnd
+    SendInput,#^{right}
+    Sleep 100
+    SendInput,!{Esc}
+    Sleep 100
+Capslock2:=""
+Return
+
 7::
 try
     SendInput,{7}
@@ -323,8 +346,6 @@ Return
 
 
 1::
-2::
-3::
 4::
 5::
 6::
