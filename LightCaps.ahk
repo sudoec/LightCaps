@@ -567,26 +567,14 @@ Capslock2:=""
 return
 
 4::
-try {
-    CheckMeeter()
-    if(!MODULE_PTR) {
-        Send, {Volume_Mute}
-    } else {
-        if(LgMeeter>=0) {
-            state:=GetParameter("Bus[0].Mute")
-            if(state)
-                SetParameter("Bus[0].Mute", OFF)
-            else
-                SetParameter("Bus[0].Mute", ON)
-        }
-    }
-}
+try
+    Send, {Media_Play_Pause}
 Capslock2:=""
 return
 
 5::
 try
-    Send, {Media_Play_Pause}
+    Send, {Volume_Mute}
 Capslock2:=""
 return
 
