@@ -42,6 +42,16 @@ try {  ;文件末尾追加字节FF, 默认以QWERTY布局启动
     InitMeeter()
 }
 
+VolumeMap(vol) {
+    if(vol<=6 && vol>=-30) {
+        return 80 + 2*vol
+    } else if(vol>6) {
+        return 92 + 4*(vol-6)/3
+    } else if(vol<-30) {
+        return 20 + 2*(vol+30)/3
+    }
+}
+
 InitMeeter() {
     VM_INSTALL_PATH := "C:\Program Files (x86)\VB\Voicemeeter"
     Dll_Name := "VoicemeeterRemote64.dll"
@@ -511,12 +521,19 @@ try {
         Send, {Volume_Down}
     } else {
         if(LgMeeter>=0) {
-            BusGain:=GetParameter("Bus[0].Gain")-3
+            BusGain:=GetParameter("Bus[0].Gain")
+            if(BusGain<=6 && BusGain>-30) {
+                BusGain -= 2
+            } else {
+                BusGain -= 3
+            }
             if(BusGain<-60)
                 BusGain:=-60
-            if(BusGain>0 && BusGain<3)
+            if(BusGain>0 && BusGain<2)
                 BusGain:=0
             SetParameter("Bus[0].Gain", BusGain)
+            SoundSet, VolumeMap(BusGain)+2
+            Send {Volume_Down}
         }
     }
 }
@@ -530,12 +547,19 @@ try {
         Send, {Volume_Up}
     } else {
         if(LgMeeter>=0) {
-            BusGain:=GetParameter("Bus[0].Gain")+3
+            BusGain:=GetParameter("Bus[0].Gain")
+            if(BusGain<6 && BusGain>=-30) {
+                BusGain += 2
+            } else {
+                BusGain += 3
+            }
             if(BusGain>12)
                 BusGain:=12
-            if(BusGain>0 && BusGain<3)
+            if(BusGain>0 && BusGain<2)
                 BusGain:=0
             SetParameter("Bus[0].Gain", BusGain)
+            SoundSet, VolumeMap(BusGain)-2
+            Send {Volume_Up}
         }
     }
 }
@@ -974,4 +998,3 @@ try
     ;runFunc(keyset.caps_lalt_f12)
 Capslock2:=""
 return
-
