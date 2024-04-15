@@ -42,6 +42,202 @@ try {  ;文件末尾追加字节FF, 默认以QWERTY布局启动
     InitMeeter()
 }
 
+; 使用IMEID激活对应的输入法
+switchIMEbyID(IMEID, WinTitle="A") {
+    ;WinGetTitle, Title, %WinTitle%
+    ControlGet, hwnd, HWND,,, %WinTitle%
+    PostMessage, 0x50, 0, %IMEID%,, ahk_id %hwnd%
+}
+; 获取当前激活窗口所使用的IME的ID
+getCurrentIMEID(WinTitle="A") {
+    WinGet, hWnd, ID, %WinTitle%
+    ThreadID:=DllCall("GetWindowThreadProcessId", "UInt", hWnd, "UInt", 0)
+    InputLocaleID:=DllCall("GetKeyboardLayout", "UInt", ThreadID, "UInt")
+    return InputLocaleID
+}
+; 判断是否处于英文模式，返回值是0表示是英文模式
+getIMEMode(WinTitle="A") {
+    ControlGet, hwnd, HWND,,, %WinTitle%
+    if  (WinActive(WinTitle))   {
+        ptrSize := !A_PtrSize ? 4 : A_PtrSize
+        VarSetCapacity(stGTI, cbSize:=4+4+(PtrSize*6)+16, 0)
+        NumPut(cbSize, stGTI,  0, "UInt")  ;   DWORD   cbSize;
+        hwnd := DllCall("GetGUIThreadInfo", Uint,0, Uint,&stGTI)
+                    ? NumGet(stGTI,8+PtrSize,"UInt") : hwnd
+    }
+    return DllCall("SendMessage"
+            , UInt, DllCall("imm32\ImmGetDefaultIMEWnd", Uint,hwnd)
+            , UInt, 0x0283 ;Message : WM_IME_CONTROL
+            ,  Int, 0x001  ;wParam  : IMC_GETCONVERSIONMODE
+            ,  Int, 0)     ;lParam  : 0
+}
+; IME状态设置
+IME_SET(SetSts, WinTitle="A")    {
+    ControlGet, hwnd, HWND,,, %WinTitle%
+    if  (WinActive(WinTitle))   {
+        ptrSize := !A_PtrSize ? 4 : A_PtrSize
+        VarSetCapacity(stGTI, cbSize:=4+4+(PtrSize*6)+16, 0)
+        NumPut(cbSize, stGTI,  0, "UInt")  ;   DWORD   cbSize;
+        hwnd := DllCall("GetGUIThreadInfo", Uint,0, Uint,&stGTI)
+                 ? NumGet(stGTI,8+PtrSize,"UInt") : hwnd
+    }
+
+    return DllCall("SendMessage"
+          , UInt, DllCall("imm32\ImmGetDefaultIMEWnd", Uint,hwnd)
+          , UInt, 0x0283 ;Message : WM_IME_CONTROL
+          ,  Int, 0x006  ;wParam  : IMC_SETOPENSTATUS
+          ,  Int, SetSts) ;lParam  : 0 or 1
+}
+; IME输入模式设置
+IME_SetConvMode(ConvMode,WinTitle="A")   {
+    ControlGet, hwnd, HWND,,, %WinTitle%
+    if  (WinActive(WinTitle))   {
+        ptrSize := !A_PtrSize ? 4 : A_PtrSize
+        VarSetCapacity(stGTI, cbSize:=4+4+(PtrSize*6)+16, 0)
+        NumPut(cbSize, stGTI,  0, "UInt")  ;   DWORD   cbSize;
+        hwnd := DllCall("GetGUIThreadInfo", Uint,0, Uint,&stGTI)
+                 ? NumGet(stGTI,8+PtrSize,"UInt") : hwnd
+    }
+    return DllCall("SendMessage"
+          , UInt, DllCall("imm32\ImmGetDefaultIMEWnd", Uint,hwnd)
+          , UInt, 0x0283     ;Message : WM_IME_CONTROL
+          ,  Int, 0x002      ;wParam  : IMC_SETCONVERSIONMODE
+          ,  Int, ConvMode)  ;lParam  : CONVERSIONMODE
+}
+; IME转换模式设置
+IME_SetSentenceMode(SentenceMode,WinTitle="A")  {
+    ControlGet, hwnd, HWND,,, %WinTitle%
+    if  (WinActive(WinTitle))   {
+        ptrSize := !A_PtrSize ? 4 : A_PtrSize
+        VarSetCapacity(stGTI, cbSize:=4+4+(PtrSize*6)+16, 0)
+        NumPut(cbSize, stGTI,  0, "UInt")  ;   DWORD   cbSize;
+        hwnd := DllCall("GetGUIThreadInfo", Uint,0, Uint,&stGTI)
+                 ? NumGet(stGTI,8+PtrSize,"UInt") : hwnd
+    }
+    return DllCall("SendMessage"
+          , UInt, DllCall("imm32\ImmGetDefaultIMEWnd", Uint,hwnd)
+          , UInt, 0x0283         ;Message : WM_IME_CONTROL
+          ,  Int, 0x004          ;wParam  : IMC_SETSENTENCEMODE
+          ,  Int, SentenceMode)  ;lParam  : SentenceMode
+}
+
+CheckAudioRelay() {
+    Process Exist, audiorelay-backend.exe
+    ProcessId := ErrorLevel
+    return ProcessId
+}
+
+GetDeviceName(device)
+{
+    VarSetCapacity(PKEY_Device_FriendlyName, 32)
+    DllCall("ole32\CLSIDFromString", "wstr", "{A45C254E-DF1C-4EFD-8020-67D146A850E0}", "ptr", &PKEY_Device_FriendlyName)
+    NumPut(14, PKEY_Device_FriendlyName, 16)
+    VarSetCapacity(prop, 16)
+    DllCall(NumGet(NumGet(device+0)+4*A_PtrSize), "ptr", device, "uint", 0, "ptr*", store)
+    DllCall(NumGet(NumGet(store+0)+5*A_PtrSize), "ptr", store, "ptr", &PKEY_Device_FriendlyName, "ptr", &prop)
+    ObjRelease(store)
+    deviceName := NumGet(prop,8)
+    deviceName := StrGet(ptr := deviceName, "UTF-16")
+    DllCall("ole32\CoTaskMemFree", "ptr", ptr)
+    return deviceName
+}
+
+SetDeviceMute(Mute, Desc="capture")
+{
+    static CLSID_MMDeviceEnumerator := "{BCDE0395-E52F-467C-8E3D-C4579291692E}",
+                  IID_IMMDeviceEnumerator := "{A95664D2-9614-4F35-A746-DE8DB63617E6}"
+    deviceEnumerator := ComObjCreate(CLSID_MMDeviceEnumerator, IID_IMMDeviceEnumerator)
+    
+    device := 0
+    DllCall(NumGet(NumGet(deviceEnumerator+0)+5*A_PtrSize), "ptr", deviceEnumerator, "wstr", Desc, "ptr*", device)
+    
+    if(Desc="capture") {
+        DllCall(NumGet(NumGet(deviceEnumerator+0)+4*A_PtrSize), "ptr", deviceEnumerator, "int", 1, "int", 0, "ptr*", device)
+    }
+    else {
+        DllCall(NumGet(NumGet(deviceEnumerator+0)+3*A_PtrSize), "ptr", deviceEnumerator, "int", 2, "uint", 1, "ptr*", devices)
+        DllCall(NumGet(NumGet(devices+0)+3*A_PtrSize), "ptr", devices, "uint*", count)
+        Loop % count
+            if DllCall(NumGet(NumGet(devices+0)+4*A_PtrSize), "ptr", devices, "uint", A_Index-1, "ptr*", device) = 0 {
+                if InStr(GetDeviceName(device), Desc)
+                    break
+            }
+        ObjRelease(devices)
+    }
+
+    ObjRelease(deviceEnumerator)
+    VarSetCapacity(IID, 16, 0)
+    DllCall("ole32\CLSIDFromString", "wstr", "{5CDF2C82-841E-4546-9722-0CF74078229A}", "ptr", &IID)
+    DllCall(NumGet(NumGet(device+0)+3*A_PtrSize), "ptr", device, "ptr", &IID, "uint", 7, "uint", 0, "ptr*", endpointVolume)
+    DllCall(NumGet(NumGet(endpointVolume+0)+14*A_PtrSize), "ptr", endpointVolume, "int", Mute, "ptr", 0)
+    ObjRelease(endpointVolume)
+    ObjRelease(device)
+}
+
+GetAppVolumeObj(ProcessId) {
+    ISimpleAudioVolume := ""
+    IMMDeviceEnumerator := ComObjCreate("{BCDE0395-E52F-467C-8E3D-C4579291692E}", "{A95664D2-9614-4F35-A746-DE8DB63617E6}")
+    DllCall(NumGet(NumGet(IMMDeviceEnumerator+0)+4*A_PtrSize), "UPtr", IMMDeviceEnumerator, "UInt", 0, "UInt", 1, "UPtrP", IMMDevice, "UInt")
+    ObjRelease(IMMDeviceEnumerator)
+
+    VarSetCapacity(GUID, 16)
+    DllCall("Ole32.dll\CLSIDFromString", "Str", "{77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F}", "UPtr", &GUID)
+    DllCall(NumGet(NumGet(IMMDevice+0)+3*A_PtrSize), "UPtr", IMMDevice, "UPtr", &GUID, "UInt", 23, "UPtr", 0, "UPtrP", IAudioSessionManager2, "UInt")
+    ObjRelease(IMMDevice)
+
+    DllCall(NumGet(NumGet(IAudioSessionManager2+0)+5*A_PtrSize), "UPtr", IAudioSessionManager2, "UPtrP", IAudioSessionEnumerator, "UInt")
+    ObjRelease(IAudioSessionManager2)
+
+    DllCall(NumGet(NumGet(IAudioSessionEnumerator+0)+3*A_PtrSize), "UPtr", IAudioSessionEnumerator, "UIntP", SessionCount, "UInt")
+    Loop % SessionCount
+    {
+        DllCall(NumGet(NumGet(IAudioSessionEnumerator+0)+4*A_PtrSize), "UPtr", IAudioSessionEnumerator, "Int", A_Index-1, "UPtrP", IAudioSessionControl, "UInt")
+        IAudioSessionControl2 := ComObjQuery(IAudioSessionControl, "{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}")
+        ObjRelease(IAudioSessionControl)
+
+        DllCall(NumGet(NumGet(IAudioSessionControl2+0)+14*A_PtrSize), "UPtr", IAudioSessionControl2, "UIntP", PID, "UInt")
+        If (PID == ProcessId)
+        {
+            ISimpleAudioVolume := ComObjQuery(IAudioSessionControl2, "{87CE5498-68D6-44E5-9215-6DA47EF883D8}")
+        }
+        ObjRelease(IAudioSessionControl2)
+    }
+    ObjRelease(IAudioSessionEnumerator)
+    return ISimpleAudioVolume
+}
+
+SetAppVolume(ProcessId, MasterVolume) {
+    MasterVolume := MasterVolume > 100 ? 100 : MasterVolume < 0 ? 0 : MasterVolume
+
+    ISimpleAudioVolume := GetAppVolumeObj(ProcessId)
+    DllCall(NumGet(NumGet(ISimpleAudioVolume+0)+3*A_PtrSize), "UPtr", ISimpleAudioVolume, "Float", MasterVolume/100.0, "UPtr", 0, "UInt")
+    ObjRelease(ISimpleAudioVolume)
+}
+
+GetAppVolume(ProcessId) {
+    local MasterVolume := ""
+
+    ISimpleAudioVolume := GetAppVolumeObj(ProcessId)
+    DllCall(NumGet(NumGet(ISimpleAudioVolume+0)+4*A_PtrSize), "UPtr", ISimpleAudioVolume, "Float*", MasterVolume, "UInt")
+    ObjRelease(ISimpleAudioVolume)
+
+    return Round(MasterVolume * 100)
+}
+
+SetAppMute(ProcessId, Muted) {
+    ISimpleAudioVolume := GetAppVolumeObj(ProcessId)
+    DllCall(NumGet(NumGet(ISimpleAudioVolume+0)+5*A_PtrSize), "UPtr", ISimpleAudioVolume, "UInt", Muted, "UPtr", 0, "UInt")
+    ObjRelease(ISimpleAudioVolume)
+}
+
+GetAppMute(ProcessId) {
+    local Muted := 2
+    ISimpleAudioVolume := GetAppVolumeObj(ProcessId)
+    DllCall(NumGet(NumGet(ISimpleAudioVolume+0)+6*A_PtrSize), "UPtr", ISimpleAudioVolume, "UInt*", Muted)
+    ObjRelease(ISimpleAudioVolume)
+    return Muted
+}
+
 VolumeMap(vol) {
     if(vol<=6 && vol>=-30) {
         return 80 + 2*vol
@@ -435,8 +631,17 @@ Capslock2:=""
 return
 
 LAlt::
-try
-    Send, {Delete}
+try {
+    if(getCurrentIMEID()=68224017) {
+        if(getIMEMode()=11 || getIMEMode()=27)
+            Send {F6}
+        else
+            Send {F7}
+    }
+    else {
+        Send, {Delete}
+    }
+}
 Capslock2:=""
 return
 
@@ -475,14 +680,19 @@ return
 
 LWin::
 try {
-    CheckMeeter()
-    if(LgMeeter>=0) {
-        if(!GuiMeeter) {
-            SetParameter("Command.Show", ON)
-            GuiMeeter:=1
-        } else {
-            SetParameter("Command.Show", OFF)
-            GuiMeeter:=0
+    ProcessId:=CheckAudioRelay()
+    if(ProcessId) {
+    }
+    else {
+        CheckMeeter()
+        if(LgMeeter>=0) {
+            if(!GuiMeeter) {
+                SetParameter("Command.Show", ON)
+                GuiMeeter:=1
+            } else {
+                SetParameter("Command.Show", OFF)
+                GuiMeeter:=0
+            }
         }
     }
 }
@@ -491,101 +701,208 @@ return
 
 1::
 try {
-    CheckMeeter()
-    if(LgMeeter>=0) {
-        SetParameter("Strip[0].Mute", OFF)
-        while(GetKeyState("1","P"))
-        {
-            Sleep, 20
-        }
-        SetParameter("Strip[0].Mute", ON)
-    }
-}
-Capslock2:=""
-return
-
-<+1::
-try {
-    CheckMeeter()
-    if(LgMeeter>=0) {
-        SetParameter("Strip[0].Mute", OFF)
-    }
+    switchIMEbyID(134481924)
+    IME_SetConvMode(0)
+    IME_SET(0)
+    Sleep 50
+    IME_SetConvMode(0)
+    IME_SET(0)
+    Sleep 150
+    IME_SetConvMode(0)
+    IME_SET(0)
 }
 Capslock2:=""
 return
 
 2::
 try {
-    CheckMeeter()
-    if(!MODULE_PTR) {
-        Send, {Volume_Down}
-    } else {
-        if(LgMeeter>=0) {
-            BusGain:=GetParameter("Bus[0].Gain")
-            if(BusGain<=6 && BusGain>-30) {
-                BusGain -= 2
-            } else {
-                BusGain -= 3
-            }
-            if(BusGain<-60)
-                BusGain:=-60
-            if(BusGain>0 && BusGain<2)
-                BusGain:=0
-            SetParameter("Bus[0].Gain", BusGain)
-            SoundSet, VolumeMap(BusGain)+2
-            Send {Volume_Down}
-        }
-    }
+    switchIMEbyID(134481924)
+    IME_SetConvMode(1025)
+    IME_SET(1)
+    Sleep 50
+    IME_SetConvMode(1025)
+    IME_SET(1)
+    Sleep 150
+    IME_SetConvMode(1025)
+    IME_SET(1)
 }
 Capslock2:=""
 return
 
 3::
 try {
-    CheckMeeter()
-    if(!MODULE_PTR) {
-        Send, {Volume_Up}
-    } else {
+    switchIMEbyID(68224017)
+    IME_SetSentenceMode(8)
+    IME_SetConvMode(25)
+    IME_SET(1)
+    Sleep 50
+    IME_SetSentenceMode(8)
+    IME_SetConvMode(25)
+    IME_SET(1)
+    Sleep 150
+    IME_SetSentenceMode(8)
+    IME_SetConvMode(25)
+    IME_SET(1)
+}
+Capslock2:=""
+return
+
+4::
+try {
+    switchIMEbyID(68224017)
+    IME_SetSentenceMode(8)
+    IME_SetConvMode(27)
+    IME_SET(1)
+    Sleep 50
+    IME_SetSentenceMode(8)
+    IME_SetConvMode(27)
+    IME_SET(1)
+    Sleep 150
+    IME_SetSentenceMode(8)
+    IME_SetConvMode(27)
+    IME_SET(1)
+}
+Capslock2:=""
+return
+
+5::
+try
+    Send, {Media_Play_Pause}
+Capslock2:=""
+return
+
+f1::
+try {
+    ProcessId:=CheckAudioRelay()
+    if(ProcessId) {
+        SetDeviceMute(false, "Virtual Mic")
+        while(GetKeyState("f1","P"))
+        {
+            Sleep, 20
+        }
+        if(GetKeyState("CapsLock","P"))
+            SetDeviceMute(true, "Virtual Mic")
+    }
+    else {
+        CheckMeeter()
         if(LgMeeter>=0) {
-            BusGain:=GetParameter("Bus[0].Gain")
-            if(BusGain<6 && BusGain>=-30) {
-                BusGain += 2
-            } else {
-                BusGain += 3
+            SetParameter("Strip[0].Mute", OFF)
+            while(GetKeyState("1","P"))
+            {
+                Sleep, 20
             }
-            if(BusGain>12)
-                BusGain:=12
-            if(BusGain>0 && BusGain<2)
-                BusGain:=0
-            SetParameter("Bus[0].Gain", BusGain)
-            SoundSet, VolumeMap(BusGain)-2
-            Send {Volume_Up}
+            if(GetKeyState("CapsLock","P"))
+                SetParameter("Strip[0].Mute", ON)
         }
     }
 }
 Capslock2:=""
 return
 
-4::
-try
-    Send, {Media_Play_Pause}
-Capslock2:=""
-return
-
-5::
-try
-    Send, {Volume_Mute}
-Capslock2:=""
-return
-
-
-y::
-h::
-n::
-f1::
 f2::
+try {
+    ProcessId:=CheckAudioRelay()
+    if(ProcessId) {
+        SoundGet, Muted,, Mute
+        Volume:=GetAppVolume(ProcessId)
+        SetAppMute(ProcessId, False)
+        SetAppVolume(ProcessId, Volume-5)
+        if(Muted="On")
+            Send, {Volume_Mute}
+        Send {Volume_Down}
+        SoundSet, Volume-5
+    }
+    else {
+        CheckMeeter()
+        if(!MODULE_PTR) {
+            Send, {Volume_Down}
+        } else {
+            if(LgMeeter>=0) {
+                BusGain:=GetParameter("Bus[0].Gain")
+                if(BusGain<=6 && BusGain>-30) {
+                    BusGain -= 2
+                } else {
+                    BusGain -= 3
+                }
+                if(BusGain<-60)
+                    BusGain:=-60
+                if(BusGain>0 && BusGain<2)
+                    BusGain:=0
+                SetParameter("Bus[0].Gain", BusGain)
+                SoundSet, VolumeMap(BusGain)+2
+                Send {Volume_Down}
+            }
+        }
+    }
+}
+Capslock2:=""
+return
+
 f3::
+try {
+    ProcessId:=CheckAudioRelay()
+    if(ProcessId) {
+        SoundGet, Muted,, Mute
+        Volume:=GetAppVolume(ProcessId)
+        SetAppMute(ProcessId, False)
+        SetAppVolume(ProcessId, Volume+5)
+        if(Muted="On")
+            Send, {Volume_Mute}
+        Send, {Volume_Up}
+        SoundSet, Volume+5
+    }
+    else {
+        CheckMeeter()
+        if(!MODULE_PTR) {
+            Send, {Volume_Up}
+        } else {
+            if(LgMeeter>=0) {
+                BusGain:=GetParameter("Bus[0].Gain")
+                if(BusGain<6 && BusGain>=-30) {
+                    BusGain += 2
+                } else {
+                    BusGain += 3
+                }
+                if(BusGain>12)
+                    BusGain:=12
+                if(BusGain>0 && BusGain<2)
+                    BusGain:=0
+                SetParameter("Bus[0].Gain", BusGain)
+                SoundSet, VolumeMap(BusGain)-2
+                Send {Volume_Up}
+            }
+        }
+    }
+}
+Capslock2:=""
+return
+
 f4::
+try {
+    ProcessId:=CheckAudioRelay()
+    if(ProcessId) {
+        SoundGet, Muted,, Mute
+        AppMuted:=GetAppMute(ProcessId)
+        SetAppMute(ProcessId, !AppMuted)
+        if((Muted="Off"&&AppMuted=0)||(Muted="On"&&AppMuted=1))
+            Send, {Volume_Mute}
+        Sleep 300
+        if(GetKeyState("f4", "P")) {
+            SetAppMute(ProcessId, False)
+            SetAppVolume(ProcessId, 100)
+            SoundSet, 100
+            Send {Volume_Up}
+            Sleep 600
+        }
+    }
+    else {
+        Send, {Volume_Mute}
+    }
+}
+Capslock2:=""
+return
+
+
 f5::
 f6::
 f7::
