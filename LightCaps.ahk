@@ -380,30 +380,15 @@ SetScrollLockState, on
 sleep 200
 SetScrollLockState, off
 return
-;---------------------------colemak-keys-set----------------------------
-#If ColeMak
+;----------------------------basic-keys-set----------------------------
 ;^!p::suspend
-e::f
-r::p
-t::g
-y::j
-u::l
-i::u
-o::y
 p::;
-s::r
-d::s
-f::t
-g::d
-j::n
-k::e
-l::i
-`;::o
-n::k
+`;::p
 =::[
-[::'
-'::=
-#If
+[::=
+^f::^t
+^e::^f
+^t::^e
 ;----------------------------keys-set-start-----------------------------
 ;  KEY_TO_NAME := {"a":"a","b":"b","c":"c","d":"d","e":"e","f":"f","g":"g","h":"h","i":"i"
 ;    ,"j":"j","k":"k","l":"l","m":"m","n":"n","o":"o","p":"p","q":"q","r":"r"
@@ -543,6 +528,18 @@ try
 Capslock2:=""
 return
 
+n::
+try
+    Send, {)}
+Capslock2:=""
+return
+
+h::
+try
+    Send, {(}
+Capslock2:=""
+return
+
 .::
 try
     Send, {.}
@@ -551,7 +548,7 @@ return
 
 ,::
 try
-    Send, {*}
+    Send, {,}
 Capslock2:=""
 return
 
@@ -563,19 +560,19 @@ return
 
 `;::
 try
-    Send, {-}
+    Send, {_}
 Capslock2:=""
 return
 
 '::
 try
-    Send, {+}
+    Send, {*}
 Capslock2:=""
 return
 
 p::
 try
-    Send, {:}
+    Send, {-}
 Capslock2:=""
 return
 
@@ -593,7 +590,7 @@ return
 
 [::
 try
-    Send, {`"}
+    Send, {+}
 Capslock2:=""
 return
 
@@ -902,7 +899,12 @@ try {
 Capslock2:=""
 return
 
-
+b::
+y::
+q::
+c::
+x::
+z::
 f5::
 f6::
 f7::
