@@ -58,7 +58,7 @@ getCurrentIMEID(WinTitle="A") {
 ; 判断是否处于英文模式，返回值是0表示是英文模式
 getIMEMode(WinTitle="A") {
     ControlGet, hwnd, HWND,,, %WinTitle%
-    if  (WinActive(WinTitle))   {
+    if  (WinActive(WinTitle)) {
         ptrSize := !A_PtrSize ? 4 : A_PtrSize
         VarSetCapacity(stGTI, cbSize:=4+4+(PtrSize*6)+16, 0)
         NumPut(cbSize, stGTI,  0, "UInt")  ;   DWORD   cbSize;
@@ -72,9 +72,9 @@ getIMEMode(WinTitle="A") {
             ,  Int, 0)     ;lParam  : 0
 }
 ; IME状态设置
-IME_SET(SetSts, WinTitle="A")    {
+IME_SET(SetSts, WinTitle="A") {
     ControlGet, hwnd, HWND,,, %WinTitle%
-    if  (WinActive(WinTitle))   {
+    if  (WinActive(WinTitle)) {
         ptrSize := !A_PtrSize ? 4 : A_PtrSize
         VarSetCapacity(stGTI, cbSize:=4+4+(PtrSize*6)+16, 0)
         NumPut(cbSize, stGTI,  0, "UInt")  ;   DWORD   cbSize;
@@ -89,9 +89,9 @@ IME_SET(SetSts, WinTitle="A")    {
           ,  Int, SetSts) ;lParam  : 0 or 1
 }
 ; IME输入模式设置
-IME_SetConvMode(ConvMode,WinTitle="A")   {
+IME_SetConvMode(ConvMode,WinTitle="A") {
     ControlGet, hwnd, HWND,,, %WinTitle%
-    if  (WinActive(WinTitle))   {
+    if  (WinActive(WinTitle)) {
         ptrSize := !A_PtrSize ? 4 : A_PtrSize
         VarSetCapacity(stGTI, cbSize:=4+4+(PtrSize*6)+16, 0)
         NumPut(cbSize, stGTI,  0, "UInt")  ;   DWORD   cbSize;
@@ -105,9 +105,9 @@ IME_SetConvMode(ConvMode,WinTitle="A")   {
           ,  Int, ConvMode)  ;lParam  : CONVERSIONMODE
 }
 ; IME转换模式设置
-IME_SetSentenceMode(SentenceMode,WinTitle="A")  {
+IME_SetSentenceMode(SentenceMode,WinTitle="A") {
     ControlGet, hwnd, HWND,,, %WinTitle%
-    if  (WinActive(WinTitle))   {
+    if  (WinActive(WinTitle)) {
         ptrSize := !A_PtrSize ? 4 : A_PtrSize
         VarSetCapacity(stGTI, cbSize:=4+4+(PtrSize*6)+16, 0)
         NumPut(cbSize, stGTI,  0, "UInt")  ;   DWORD   cbSize;
@@ -127,8 +127,7 @@ CheckAudioRelay() {
     return ProcessId
 }
 
-GetDeviceName(device)
-{
+GetDeviceName(device) {
     VarSetCapacity(PKEY_Device_FriendlyName, 32)
     DllCall("ole32\CLSIDFromString", "wstr", "{A45C254E-DF1C-4EFD-8020-67D146A850E0}", "ptr", &PKEY_Device_FriendlyName)
     NumPut(14, PKEY_Device_FriendlyName, 16)
@@ -142,8 +141,7 @@ GetDeviceName(device)
     return deviceName
 }
 
-SetDeviceMute(Mute, Desc="capture")
-{
+SetDeviceMute(Mute, Desc="capture") {
     static CLSID_MMDeviceEnumerator := "{BCDE0395-E52F-467C-8E3D-C4579291692E}",
                   IID_IMMDeviceEnumerator := "{A95664D2-9614-4F35-A746-DE8DB63617E6}"
     deviceEnumerator := ComObjCreate(CLSID_MMDeviceEnumerator, IID_IMMDeviceEnumerator)
@@ -189,8 +187,7 @@ GetAppVolumeObj(ProcessId) {
     ObjRelease(IAudioSessionManager2)
 
     DllCall(NumGet(NumGet(IAudioSessionEnumerator+0)+3*A_PtrSize), "UPtr", IAudioSessionEnumerator, "UIntP", SessionCount, "UInt")
-    Loop % SessionCount
-    {
+    Loop % SessionCount {
         DllCall(NumGet(NumGet(IAudioSessionEnumerator+0)+4*A_PtrSize), "UPtr", IAudioSessionEnumerator, "Int", A_Index-1, "UPtrP", IAudioSessionControl, "UInt")
         IAudioSessionControl2 := ComObjQuery(IAudioSessionControl, "{BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D}")
         ObjRelease(IAudioSessionControl)
@@ -336,29 +333,45 @@ GetDesktop() {
     return 0
 }
 ;---------------CAPSLOCK--------------
-global CapsLock2, CapsLock, HalfSleep
+global CapsLock, CapsLock2, ShiftLock, HalfSleep
 
 $*Capslock::
-;Capslock:  Capslock 键状态标记，按下是1，松开是0
-;Capslock2:  是否使用过 Capslock+ 功能标记，使用过会清除这个变量
-CapsLock2:=CapsLock:=1
-
-SetTimer, setCapsLock2, -180 ; 180ms 犹豫操作时间
+CapsLock:=CapsLock2:=1
+SetTimer, setCapsLock2, -180
 
 KeyWait, Capslock
-;while(GetKeyState("CapsLock","P")) {
-;    Sleep, 20
-;}
-CapsLock:=""  ;Capslock最优先置空，来关闭 Capslock+ 功能的触发
-if CapsLock2
-{
+CapsLock:=""
+if CapsLock2 {
     Send, {BackSpace}
 }
 CapsLock2:=""
 return
 
+~LShift::
+ShiftLock:=1
+SetTimer, setShiftLock, -180
+
+KeyWait, LShift
+if ShiftLock {
+    if(getCurrentIMEID()==134481924) {
+        if(getIMEMode()==0) {
+            IME_SetConvMode(1025)
+            IME_SET(1)
+        } else {
+            IME_SetConvMode(0)
+            IME_SET(0)
+        }
+    }
+}
+ShiftLock:=""
+return
+
 setCapsLock2:
 CapsLock2:=""
+return
+
+setShiftLock:
+ShiftLock:=""
 return
 
 setHalfSleep:
