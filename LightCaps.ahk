@@ -481,6 +481,18 @@ try
 Capslock2:=""
 return
 
+q::
+try
+    Send, ^{Tab}
+Capslock2:=""
+return
+
+tab::
+try
+    Send, ^+{Tab}
+Capslock2:=""
+return
+
 7::
 try
     Send, {7}
@@ -914,7 +926,6 @@ return
 
 b::
 y::
-q::
 c::
 x::
 z::
@@ -926,7 +937,6 @@ f9::
 f10::
 f11::
 f12::
-tab::
 ;esc::
 enter::
 ;space::
