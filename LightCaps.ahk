@@ -27,6 +27,7 @@ start:
 global ColeMak:=1
 global LgMeeter:=-1
 global GuiMeeter:=0
+global Semicolon:=0
 global MODULE_PTR:=0
 global VMR_FUNCTIONS:={}
 global OFF:=0
@@ -402,6 +403,20 @@ p::;
 ^f::^t
 ^e::^f
 ^t::^e
+!,::Send, {U+FF0C}
+!.::Send, {U+3002}
+!/::Send, {U+3001}
+!+/::Send, {U+FF1F}
+!p::Send, {U+FF1B}
+!+p::Send, {U+FF1A}
+!'::
+Semicolon:=!Semicolon
+Send, % Semicolon ? "{U+2018}" : "{U+2019}"
+return
+!+'::
+Semicolon:=!Semicolon
+Send, % Semicolon ? "{U+201C}" : "{U+201D}"
+return
 ;----------------------------keys-set-start-----------------------------
 ;  KEY_TO_NAME := {"a":"a","b":"b","c":"c","d":"d","e":"e","f":"f","g":"g","h":"h","i":"i"
 ;    ,"j":"j","k":"k","l":"l","m":"m","n":"n","o":"o","p":"p","q":"q","r":"r"
@@ -436,24 +451,28 @@ return
 s::
 try
     Send, {left}
+    Semicolon:=0
 Capslock2:=""
 return
 
 f::
 try
     Send, {right}
+    Semicolon:=1
 Capslock2:=""
 return
 
 a::
 try
     Send, ^{Left}
+    Semicolon:=0
 Capslock2:=""
 return
 
 g::
 try
     Send, ^{right}
+    Semicolon:=1
 Capslock2:=""
 return
 
@@ -472,12 +491,14 @@ return
 w::
 try
     Send, {home}
+    Semicolon:=0
 Capslock2:=""
 return
 
 r::
 try
     Send, {end}
+    Semicolon:=1
 Capslock2:=""
 return
 
