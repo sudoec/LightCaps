@@ -333,8 +333,13 @@ GetDesktop() {
     }
     return 0
 }
+
+AltLock() {
+    AltLock:=1
+    SetTimer, setAltLock, -180
+}
 ;---------------CAPSLOCK--------------
-global CapsLock, CapsLock2, ShiftLock, HalfSleep
+global CapsLock, CapsLock2, AltLock, ShiftLock, HalfSleep
 
 $*Capslock::
 CapsLock:=CapsLock2:=1
@@ -371,6 +376,10 @@ setCapsLock2:
 CapsLock2:=""
 return
 
+setAltLock:
+AltLock:=""
+return
+
 setShiftLock:
 ShiftLock:=""
 return
@@ -403,19 +412,41 @@ p::;
 ^f::^t
 ^e::^f
 ^t::^e
-!,::Send, {U+FF0C}
-!.::Send, {U+3002}
-!/::Send, {U+3001}
-!+/::Send, {U+FF1F}
-!p::Send, {U+FF1B}
-!+p::Send, {U+FF1A}
-!'::
-Semicolon:=!Semicolon
-Send, % Semicolon ? "{U+2018}" : "{U+2019}"
+
+$!,::
+AltLock()
+KeyWait, `,
+Send, % (AltLock ? "{U+FF0C}" : "{U+300A}")
 return
-!+'::
-Semicolon:=!Semicolon
-Send, % Semicolon ? "{U+201C}" : "{U+201D}"
+
+$!.::
+AltLock()
+KeyWait, .
+Send, % (AltLock ? "{U+3002}" : "{U+300B}")
+return
+
+$!/::
+AltLock()
+KeyWait, /
+Send, % (AltLock ? "{U+FF1F}" : "{U+3001}")
+return
+
+$!p::
+AltLock()
+KeyWait, p
+Send, % (AltLock ? "{U+FF1A}" : "{U+FF1B}")
+return
+
+$!'::
+AltLock()
+KeyWait, '
+if(AltLock) {
+    Semicolon:=!Semicolon
+    Send, % Semicolon ? "{U+201C}" : "{U+201D}"
+} else {
+    Semicolon:=!Semicolon
+    Send, % Semicolon ? "{U+2018}" : "{U+2019}"
+}
 return
 ;----------------------------keys-set-start-----------------------------
 ;  KEY_TO_NAME := {"a":"a","b":"b","c":"c","d":"d","e":"e","f":"f","g":"g","h":"h","i":"i"
@@ -600,7 +631,9 @@ return
 
 /::
 try
-    Send, {/}
+AltLock()
+KeyWait, /
+Send, % (AltLock ? "{/}" : "{\}")
 Capslock2:=""
 return
 
@@ -1262,7 +1295,10 @@ return
 
 <!/::
 try
-    ;runFunc(keyset.caps_lalt_slash)
+AltLock()
+KeyWait, /
+Send, % (AltLock ? "{\}" : "{|}")
+return
 Capslock2:=""
 return
 
