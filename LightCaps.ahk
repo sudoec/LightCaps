@@ -4,6 +4,7 @@
 #SingleInstance force
 #MaxHotkeysPerInterval 500
 ListLines Off
+CoordMode, Mouse, Screen
 Process Priority,,High
 
 
@@ -32,6 +33,8 @@ global MODULE_PTR:=0
 global VMR_FUNCTIONS:={}
 global OFF:=0
 global ON:=1
+global hwndA, hwndM, classA, classM, M_Rec, M_Tick:=0
+global service := ComObjGet("winmgmts:{impersonationLevel=impersonate}!\\.\root\WMI")
 OnExit("ExitScript")
 
 try {  ;文件末尾追加字节FF, 默认以QWERTY布局启动
@@ -334,12 +337,376 @@ GetDesktop() {
     return 0
 }
 
+AdjustScreenBrightness(step) {
+    ;service := "winmgmts:{impersonationLevel=impersonate}!\\.\root\WMI"
+    ;monitors := ComObjGet(service).ExecQuery("SELECT * FROM WmiMonitorBrightness WHERE Active=TRUE")
+    ;monMethods := ComObjGet(service).ExecQuery("SELECT * FROM wmiMonitorBrightNessMethods WHERE Active=TRUE")
+    monitors := service.ExecQuery("SELECT * FROM WmiMonitorBrightness WHERE Active=TRUE")
+    monMethods := service.ExecQuery("SELECT * FROM wmiMonitorBrightNessMethods WHERE Active=TRUE")
+    minBrightness := 0
+
+    for i in monitors {
+        curt := i.CurrentBrightness
+        break
+    }
+    toSet := curt + step
+    if (toSet > 100) {
+        return
+    }
+    if (toSet < minBrightness) {
+        toSet := minBrightness
+    }
+
+    for i in monMethods {
+        i.WmiSetBrightness(0, toSet)
+        break
+    }
+}
+
+;---------------WINMANAGE--------------
+WinRec(win) {
+    OrderNew:=[]
+    Loop, % M_Rec.MaxIndex()
+    {
+        window:=M_Rec[A_Index]
+        if(window.Hwnd=win.Hwnd) {
+            isExist:=1
+            if(win.Size!=0)
+                OrderNew.Push(win)
+        } else {
+            OrderNew.Push(window)
+        }
+    }
+    if(!isExist && win.Size=1)
+        OrderNew.Push(win)
+    M_Rec:=OrderNew
+}
+
+WinRecIn(win) {
+    Loop, % M_Rec.MaxIndex()
+    {
+        window:=M_Rec[A_Index]
+        if(window.Hwnd=win.Hwnd) {
+            return 1
+        }
+    }
+    return 0
+}
+
+WinHideList(List)
+{
+    Loop, % List.MaxIndex()
+    {
+        hwnd := List[List.MaxIndex()-A_Index+1].Hwnd
+        WinSet, Transparent, 0, ahk_id %hwnd%
+    }
+}
+
+WinShowList(List)
+{
+    Loop, % List.MaxIndex()
+    {
+        hwnd := List[A_Index].Hwnd
+        WinSet, Transparent, 255, ahk_id %hwnd%
+    }
+}
+
+WinHideNorm(List)
+{
+    Loop, % List.MaxIndex()
+    {
+        win:=List[List.MaxIndex()-A_Index+1]
+        if(win.Opacity && win.Size=0)
+            WinSet, Transparent, 0, % "ahk_id" win.Hwnd
+    }
+}
+
+WinHideMax(List)
+{
+    Loop, % List.MaxIndex()
+    {
+        win:=List[List.MaxIndex()-A_Index+1]
+        if(win.Opacity && win.Size=1)
+            WinSet, Transparent, 0, % "ahk_id" win.Hwnd
+    }
+}
+
+WinMinimizeList(List) {
+    Loop, % List.MaxIndex()
+    {
+        win:=List[List.MaxIndex()-A_Index+1]
+        WinSet, Transparent, 0, % "ahk_id" win.Hwnd
+        WinMinimize, ahk_id %hwnd%
+        WinSet, Transparent, 255, % "ahk_id" win.Hwnd
+    }
+}
+
+WinMinimizeFirst(List) {
+    if(List.MaxIndex()) {
+        win:=List[1]
+        WinSet, Transparent, 0, % "ahk_id" win.Hwnd
+        WinMinimize, % "ahk_id" win.Hwnd
+        WinSet, Transparent, 255, % "ahk_id" win.Hwnd
+    }
+}
+
+WinRestoreList(List)
+{
+    Loop, % List.MaxIndex()
+    {
+        win:=List[A_Index]
+        if(win.Opacity)
+            WinSet, Transparent, 255, % "ahk_id" win.Hwnd
+    }
+}
+
+WinRestoreNorm(List)
+{
+    OrderM:=WinGetMin(List)
+    OrderN:=WinGetNorm(WinOrder())
+    Loop, % OrderM.MaxIndex()
+    {
+        win:=OrderM[OrderM.MaxIndex()-A_Index+1]
+        if(!WinRecIn(win)) {
+            hwnd:=win.Hwnd
+            WinSet, Transparent, 0, ahk_id %hwnd%
+            WinRestore, ahk_id %hwnd%
+            WinSet, Top,, ahk_id %hwnd%
+            WinGet, style, Style, ahk_id %hwnd%
+            if((style & 0x01000000)) {
+                WinRec(win)
+                WinMinimize, ahk_id %hwnd%
+                WinSet, Transparent, 255, ahk_id %hwnd%
+            } else {
+                OrderN.Push(win)
+            }
+        }
+    }
+   ;WinActiveFirst(OrderN)
+    WinShowList(OrderN)
+}
+
+WinRestoreMax(List)
+{
+    OrderM:=WinGetMin(List)
+    OrderN:=[]
+    Loop, % OrderM.MaxIndex()
+    {
+        win:=OrderM[A_Index]
+        hwnd:=win.Hwnd
+        WinSet, Transparent, 0, ahk_id %hwnd%
+        WinRestore, ahk_id %hwnd%
+        WinSet, Bottom,, ahk_id %hwnd%
+        WinGet, style, Style, ahk_id %hwnd%
+        if((style & 0x01000000)) {
+            WinRec(win)
+            OrderN.Push(win)  
+        } else {
+            WinMinimize, ahk_id %hwnd%
+            WinSet, Transparent, 255, ahk_id %hwnd%
+        }
+    }
+    WinActiveFirst(OrderN)
+    WinShowList(OrderN)
+}
+
+WinRestoreMin(List)
+{
+    WinHideList(List)
+    Loop, % List.MaxIndex()
+    {
+        win:=List[A_Index]
+        WinRestore, % "ahk_id" win.Hwnd
+        WinSet, Bottom,, % "ahk_id" win.Hwnd
+    }
+    WinActiveFirst(List)
+    WinShowList(List)
+}
+
+WinSetPos(hwndA, hwndB)
+{
+    DllCall("SetWindowPos", "uint", hwndA, "uint", hwndB
+    , "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x0001 | 0x0002 | 0x0010)
+}
+
+MouseInRect(Rect, Type:=1) {
+    MouseGetPos, msX, msY
+    RectRight := Rect.X + Rect.Width
+    RectBottom := Rect.Y + Rect.Height*Type
+    isXInBounds := (msX >= Rect.X && msX <= RectRight)
+    isYInBounds := (msY >= Rect.Y && msY <= RectBottom)
+    return isXInBounds && isYInBounds
+}
+
+MouseTrayLeft() {
+    MouseGetPos,,, hwnd
+    MouseGetPos, msX, msY
+    WinGetClass, class, ahk_id %hwnd%
+    return (class="Shell_TrayWnd" && msX<A_ScreenWidth*0.25) ? 1 : 0
+}
+
+WinOrder()
+{
+    WinGet, hwndA, ID, A
+    WinGet, windowList, List
+    MouseGetPos,,, hwndM
+    WinGetClass, classA, ahk_id %hwndA%
+    WinGetClass, classM, ahk_id %hwndM%
+    Order := []
+    try {  
+        Loop, %windowList% {
+            hwnd := windowList%A_Index%
+            WinGet, iPID, PID, ahk_id %hwnd%
+            WinGet, iName, ProcessName, ahk_pid %iPID%
+            WinGet, opacity, Transparent, ahk_id %hwnd%
+            WinGet, style, Style, ahk_id %hwnd%
+            WinGetTitle, title, ahk_id %hwnd%
+            WinGetClass, class, ahk_id %hwnd%
+            WinGetPos, X, Y, Width, Height, ahk_id %hwnd%
+            rect := {X: X, Y: Y, Width: Width, Height: Height}
+            size := (style & 0x01000000) ? 1 : 0
+            size := (style & 0x20000000) ? -1 : size
+            size := (style = 0x960B0000) ? 1 : size
+            opacity := opacity="" ? 255 : opacity
+            if((style >> 24) = 0x94 || (style >> 24) = 0x95 || ((style >> 24) = 0x96 && style!=0x96CF0000 && style!=0x960B0000) || (style >> 24) = 0x9C)
+                continue
+            
+            window := {Hwnd: hwnd, Name: iName, PID: iPID, Rect: rect, Style: style, Size: size, Opacity: opacity, Level: A_Index}
+            windowInfo .= iName "(" iPID ") --> " class "[" title "], "  hwnd ", " style "<" size ", " opacity ">, (" rect.X "," rect.Y "," rect.Width "," rect.Height ")" "`n"
+            Order.Push(window)
+            WinRec(window)
+        }
+    }
+    return Order
+}
+
+WinGetMin(Order)
+{
+    OrderNew:=[]
+    Loop, % Order.MaxIndex()
+    {
+        window:=Order[A_Index]
+        if(window.Size=-1) {
+            OrderNew.Push(window)
+        }
+    }
+    return OrderNew
+}
+
+WinGetMax(Order)
+{
+    OrderNew:=[]
+    Loop, % Order.MaxIndex()
+    {
+        window:=Order[A_Index]
+        if(window.Size=1) {
+            OrderNew.Push(window)
+        }
+    }
+    return OrderNew
+}
+
+WinGetNorm(Order)
+{
+    OrderNew:=[]
+    Loop, % Order.MaxIndex()
+    {
+        window:=Order[A_Index]
+        if(window.Size=0) {
+            OrderNew.Push(window)
+        }
+    }
+    return OrderNew
+}
+
+WinGetFirst(Order, Type:=0)
+{
+    Loop, % Order.MaxIndex()
+    {
+        win:=Order[A_Index]
+        if(Type=0 && win.Size>=0) {
+            return win
+        }
+        if(Type=1 && win.Size>=0 && win.Opacity) {
+            return win
+        }
+    }
+    return 0
+}
+
+WinActiveFirst(Order, Type:=0)
+{
+    hwnd:=WinGetFirst(Order, Type).Hwnd
+    WinActivate, ahk_id %hwnd%
+}
+
+WinActiveList(List)
+{
+    Loop, % List.MaxIndex()
+    {
+        hwnd:=List[A_Index].Hwnd
+        if(A_Index=1) {
+            hwndA:=hwnd
+            WinActivate, ahk_id %hwnd%
+        } else {
+            WinSetPos(hwnd, hwndA)
+        }
+    }
+}
+
+WinCheckVisible(Order, Type:=0)
+{
+    M_Visible:=0
+    Loop, % Order.MaxIndex()
+    {
+        win:=Order[A_Index]
+        if(win.Opacity && win.Size>=0) {
+            if(Type=0)
+                M_Visible++
+            if(Type=1 && win.Size=1)
+                M_Visible++
+            if(Type=2 && win.Size=0)
+                M_Visible++
+        }
+    }
+    return M_Visible
+}
+
+WinCheckType(Order)
+{
+    M_Visible:=WinCheckVisible(Order)
+    if(M_Visible) {
+        if(WinGetFirst(Order, 1).Size)
+            return 3
+        if(WinCheckVisible(Order, 1))
+            return 2
+        else
+            return 1
+    } else {
+        return 0
+    }
+}
+
+WinCheckEqual(OrderA, OrderB)
+{
+    if(OrderA.MaxIndex()!=OrderB.MaxIndex())
+        return 0
+    Loop, % OrderA.MaxIndex()
+    {
+        winA:=OrderA[A_Index]
+        winB:=OrderB[A_Index]
+        if(winA.Hwnd!=winB.Hwnd || winA.Opacity!=winB.Opacity)
+            return 0
+    }
+    return 1
+}
+;---------------CAPSLOCK--------------
+global CapsLock, CapsLock2, AltLock, ShiftLock, HalfSleep
+
 AltLock() {
     AltLock:=1
     SetTimer, setAltLock, -180
 }
-;---------------CAPSLOCK--------------
-global CapsLock, CapsLock2, AltLock, ShiftLock, HalfSleep
 
 $*Capslock::
 CapsLock:=CapsLock2:=1
@@ -377,7 +744,7 @@ CapsLock2:=""
 return
 
 setAltLock:
-AltLock:=""
+AltLock1:=""
 return
 
 setShiftLock:
@@ -447,6 +814,293 @@ if(AltLock) {
     Semicolon:=!Semicolon
     Send, % Semicolon ? "{U+2018}" : "{U+2019}"
 }
+return
+
+#F8::
+    WinGet, hwnd, ID, A
+    WinGet, iName, ProcessName, ahk_id %hwnd%
+    WinGetClass, class, ahk_id %hwnd%
+    if(iName="terminal64.exe") {
+        Send ^f
+    } else if(class="Progman" || iName="vivaldi.exe" || iName="chrome.exe" || iName="msedge.exe") {
+        Send ^w
+    } else {
+        Send !{f4}
+    }
+return
+
+#+F8::
+    Send ^+t
+Return
+
+#F9::
+    Send ^+{tab}
+Return
+
+#F10::
+    Send ^{tab}
+Return
+
+#+F9::
+    Send !{Right}
+Return
+
+#+F10::
+    Send !{Left}
+Return
+
+#F11::
+try {
+    Order:=WinOrder()
+    if(M_Tick+2000>A_TickCount) {
+        WinRestore, % "ahk_id" Order[Order.MaxIndex()].Hwnd
+        M_Tick:=0
+        return
+    }
+    if(classM="Progman") {
+        if(classA="Progman" || classA="Shell_TrayWnd")
+            return
+        Loop, % Order.MaxIndex()
+        {
+            win:=Order[Order.MaxIndex()-A_Index+1]
+            hwnd:=win.Hwnd
+            if(A_Index<Order.MaxIndex()) {
+                if(WinCheckVisible(Order)>1)
+                    WinSet, Transparent, 0, ahk_id %hwnd%
+                else
+                    WinSet, Transparent, 255, ahk_id %hwnd%
+            }
+        }
+    } else if(classM="Shell_TrayWnd") {
+        if(MouseTrayLeft()) {
+            switch WinCheckType(Order) {
+                case 0:
+                    WinRestoreNorm(Order)
+                case 1:
+                    WinRestoreNorm(Order)
+            }
+            return
+        }
+        WinActivate, ahk_class Shell_TrayWnd
+        Send, {LButton}
+        Sleep, 20
+        WinGet, hwndA, ID, A
+        WinGetClass, classA, ahk_id %hwndA%
+        if(classA="Progman" || classA="Shell_TrayWnd")
+            return
+        WinSet, Transparent, 255, ahk_id %hwndA%
+    } else if(hwndA=hwndM) {
+        if(Order[1].Size=0) {
+            WinShowList(WinGetNorm(Order))
+            WinHideList(WinGetMax(Order))
+        }
+        if(Order[1].Size=1) {
+            WinShowList(WinGetMax(Order))
+            WinHideList(WinGetNorm(Order))
+        }
+        Order:=WinOrder()
+        Loop, % Order.MaxIndex()
+        {
+            win:=Order[Order.MaxIndex()-A_Index+1]
+            if(win.Opacity && MouseInRect(win.Rect)) {
+                WinSet, AlwaysOnTop, Off, % "ahk_id" hwndM
+                WinActivate, % "ahk_id" win.Hwnd
+                break
+            }
+        }
+    } else {
+        Loop, % Order.MaxIndex()
+        {
+            win:=Order[A_Index]
+            if(A_Index>1 && win.Opacity && win.Hwnd!=hwndM && MouseInRect(win.Rect)) {
+                WinSetPos(hwndM, Order[Order.MaxIndex()].Hwnd)
+                WinSetPos(win.hwnd, Order[1].Hwnd)
+                break
+            }
+        }
+    }
+}
+return
+
+#F12::
+try {
+    Order:=WinOrder()
+    if(classM="Progman") {
+        
+    } else if(classM="Shell_TrayWnd") {
+        if(MouseTrayLeft()) {
+            switch WinCheckType(Order) {
+                case 0:
+                case 1:
+                    OrderM:=WinGetNorm(Order)
+                    WinMinimizeFirst(OrderM)
+                    return
+            }
+            return
+        }
+        WinActivate, ahk_class Shell_TrayWnd
+        Send, {LButton}
+        Sleep, 20
+        WinGet, hwndA, ID, A
+        WinGetClass, classA, ahk_id %hwndA%
+        if(classA="Progman" || classA="Shell_TrayWnd")
+            return
+        WinSet, Transparent, 0, ahk_id %hwndA%
+        Order := WinOrder()
+        Loop, % Order.MaxIndex()
+        {
+            win:=Order[A_Index]
+            if(win.Opacity && win.Size!=-1) {
+                WinActivate, % "ahk_id" win.Hwnd
+                break
+            }
+        }
+    } else if(hwndA=hwndM) {
+        if(Order[1].Size=0) {
+            WinShowList(WinGetNorm(Order))
+            WinHideList(WinGetMax(Order))
+        }
+        if(Order[1].Size=1) {
+            WinShowList(WinGetMax(Order))
+            WinHideList(WinGetNorm(Order))
+        }
+        Order:=WinOrder()
+        Loop, % Order.MaxIndex()
+        {
+            win:=Order[A_Index]
+            if(A_Index=1 && MouseInRect(win.Rect, 0.1)) {
+                M_Tick:=A_TickCount
+                WinMinimize, % "ahk_id" win.Hwnd
+                win:=WinGetFirst(WinOrder())
+                if(win) {
+                    WinActivate, % "ahk_id" win.Hwnd
+                } else {
+                    WinActivate, ahk_class Shell_TrayWnd
+                }
+                break
+            }
+            if(A_Index>1 && win.Opacity && MouseInRect(win.Rect)) {
+                WinSetPos(hwndM, Order[Order.MaxIndex()].Hwnd)
+                WinActivate, % "ahk_id" win.Hwnd
+                break
+            }
+        }
+    } else {
+        WinGetPos, X, Y, Width, Height, ahk_id %hwndM%
+        rect := {X: X, Y: Y, Width: Width, Height: Height}
+        if(MouseInRect(rect, 0.1)) {
+            M_Tick:=A_TickCount
+            WinMinimize, % "ahk_id" hwndM
+        } else {
+            WinActivate, % "ahk_id" hwndM
+        }
+    }
+}
+return
+
+#+F11::
+try {
+    Order:=WinOrder()
+    switch WinCheckType(Order) {
+        case 0:
+            return
+        case 1:
+            WinHideList(WinGetNorm(Order))
+            WinActivate, ahk_class Shell_TrayWnd
+            return
+        case 2:
+            WinShowList(WinGetNorm(Order))
+            WinHideList(WinGetMax(Order))
+            return
+        case 3:
+            WinHideList(WinGetMax(Order))
+            if(!WinGetNorm(Order).MaxIndex()) {
+                WinActivate, ahk_class Shell_TrayWnd
+                return
+            }
+            WinShowList(WinGetNorm(Order))
+            WinActiveFirst(WinGetNorm(Order))
+            return
+    }
+}
+return
+
+#+F12::
+try {
+    Order:=WinOrder()
+    switch WinCheckType(Order) {
+        case 0:
+            OrderN:=WinGetNorm(Order)
+            if(!OrderN.MaxIndex())
+                OrderN:=WinGetMax(Order)
+            WinShowList(OrderN)
+            WinActiveFirst(OrderN)
+        case 1:
+            if(WinCheckVisible(Order, 2)=WinGetNorm(Order).MaxIndex()) {
+                if(WinGetMax(Order).MaxIndex()) {
+                    WinShowList(WinGetMax(Order))
+                    WinActiveFirst(WinGetMax(Order))
+                    WinHideList(WinGetNorm(Order))
+                } else {
+                    WinRestoreMax(WinGetMin(Order))
+                    WinHideList(WinGetNorm(Order))
+                }
+                
+            } else {
+                WinShowList(WinGetNorm(Order))
+            }
+        case 2:
+            WinShowList(WinGetMax(Order))
+            WinActiveFirst(WinGetMax(Order))
+            WinHideList(WinGetNorm(Order))
+        case 3:
+            return
+    }
+}
+return
+
+#A::
+    ControlGet, class, Hwnd,, SysListView321, ahk_class Progman
+    If class =
+        ControlGet, class, Hwnd,, SysListView321, ahk_class WorkerW
+    If DllCall("IsWindowVisible", UInt,class)
+        WinHide, ahk_id %class%
+    Else
+        WinShow, ahk_id %class%
+Return
+
+#C::
+    Send ^c
+    clipboard = %clipboard%
+    tooltip, %clipboard%
+    sleep, 500
+    tooltip
+Return
+
+#Q::
+    Sleep 500
+    SendMessage, 0x112, 0xF170, 2,, Program Manager ; 关闭显示器: 0x112 为 WM_SYSCOMMAND, 0xF170 为 SC_MONITORPOWER. ; 可使用 -1 代替 2 打开显示器，1 代替 2 激活显示器的节能模式
+return
+
+#H::
+    KeyPath = Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\
+    RegRead, CurrentHiddenValue, HKEY_CURRENT_USER, %KeyPath%, Hidden
+    RegRead, CurrentSuperHiddenValue, HKEY_CURRENT_USER, %KeyPath%, ShowSuperHidden
+    if(CurrentHiddenValue==1) {
+        if(CurrentSuperHiddenValue==0) {
+            NewHiddenValue:=1
+            NewSuperHiddenValue:=1
+        } else {
+            NewHiddenValue:=2
+            NewSuperHiddenValue:=0
+        }
+    } else {
+        NewHiddenValue:=1
+        NewSuperHiddenValue:=0
+    }
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, %KeyPath%, Hidden, %NewHiddenValue%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, %KeyPath%, ShowSuperHidden, %NewSuperHiddenValue%
+    Send {Browser_Refresh}
 return
 ;----------------------------keys-set-start-----------------------------
 ;  KEY_TO_NAME := {"a":"a","b":"b","c":"c","d":"d","e":"e","f":"f","g":"g","h":"h","i":"i"
@@ -978,13 +1632,25 @@ try {
 Capslock2:=""
 return
 
+f5::
+try {
+    AdjustScreenBrightness(-2)
+}
+Capslock2:=""
+return
+
+f6::
+try {
+    AdjustScreenBrightness(2)
+}
+Capslock2:=""
+return
+
 b::
 y::
 c::
 x::
 z::
-f5::
-f6::
 f7::
 f8::
 f9::
