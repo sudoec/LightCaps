@@ -399,31 +399,25 @@ WinHideList(List)
     {
         win := List[List.MaxIndex()-A_Index+1]
         WinSet, Transparent, 0, % "ahk_id" win.Hwnd
-        WinSet, Disable,, % "ahk_id" win.Hwnd
         if(win.Name = "ApplicationFrameHost.exe") {
-            WinHide, % "ahk_id" win.Hwnd
             hwndU:=win.Hwnd
+            WinHide, % "ahk_id" win.Hwnd
+        } else {
+            WinSet, Disable,, % "ahk_id" win.Hwnd
         }
     }
 }
 
 WinShowUwp()
 {
-    if(hwndU>0) {
+    if(hwndU) {
         WinShow, ahk_id %hwndU%
-        ;WinSet, Transparent, 255, ahk_id %hwndU%
-        hwndU:=0
-        return 1
-    } else if(hwndU<0) {
-        hwnd:=-hwndU
-        WinShow, ahk_id %hwnd%
-        WinSet, Top,, ahk_id %hwnd%
+        WinSet, Transparent, 255, ahk_id %hwndU%
         hwndU:=0
         return 1
     } else {
         return 0
     }
-    ;WinActivate, ahk_id %hwndU%
 }
 
 WinShowList(List)
@@ -431,8 +425,8 @@ WinShowList(List)
     Loop, % List.MaxIndex()
     {
         hwnd := List[A_Index].Hwnd
-        WinSet, Transparent, 255, ahk_id %hwnd%
         WinSet, Enable,, ahk_id %hwnd%
+        WinSet, Transparent, 255, ahk_id %hwnd%
     }
 }
 
@@ -441,8 +435,10 @@ WinHideNorm(List)
     Loop, % List.MaxIndex()
     {
         win:=List[List.MaxIndex()-A_Index+1]
-        if(win.Opacity && win.Size=0)
+        if(win.Opacity && win.Size=0) {
             WinSet, Transparent, 0, % "ahk_id" win.Hwnd
+            WinSet, Disable,, % "ahk_id" win.Hwnd
+        }
     }
 }
 
@@ -451,8 +447,10 @@ WinHideMax(List)
     Loop, % List.MaxIndex()
     {
         win:=List[List.MaxIndex()-A_Index+1]
-        if(win.Opacity && win.Size=1)
+        if(win.Opacity && win.Size=1) {
             WinSet, Transparent, 0, % "ahk_id" win.Hwnd
+            WinSet, Disable,, % "ahk_id" win.Hwnd
+        }
     }
 }
 
@@ -900,10 +898,13 @@ try {
             win:=Order[Order.MaxIndex()-A_Index+1]
             hwnd:=win.Hwnd
             if(A_Index<Order.MaxIndex()) {
-                if(WinCheckVisible(Order)>1)
+                if(WinCheckVisible(Order)>1) {
                     WinSet, Transparent, 0, ahk_id %hwnd%
-                else
+                    WinSet, Disable,, ahk_id %hwnd%
+                } else {
                     WinSet, Transparent, 255, ahk_id %hwnd%
+                    WinSet, Enable,, ahk_id %hwnd%
+                }
             }
         }
     } else if(classM="Shell_TrayWnd") {
@@ -927,10 +928,11 @@ try {
         WinSet, Enable,, ahk_id %hwndA%
     } else if(hwndA=hwndM) {
         if(Order[1].Size=0) {
-            WinShowList(WinGetNorm(Order))
+            ;WinShowList(WinGetNorm(Order))
             WinHideList(WinGetMax(Order))
         }
         if(Order[1].Size=1) {
+            WinShowUwp()
             WinShowList(WinGetMax(Order))
             WinHideList(WinGetNorm(Order))
         }
@@ -982,6 +984,7 @@ try {
         if(classA="Progman" || classA="Shell_TrayWnd")
             return
         WinSet, Transparent, 0, ahk_id %hwndA%
+        WinSet, Disable,, ahk_id %hwndA%
         Order := WinOrder()
         Loop, % Order.MaxIndex()
         {
@@ -997,6 +1000,7 @@ try {
             WinHideList(WinGetMax(Order))
         }
         if(Order[1].Size=1) {
+            WinShowUwp()
             WinShowList(WinGetMax(Order))
             WinHideList(WinGetNorm(Order))
         }
