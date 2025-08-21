@@ -600,6 +600,8 @@ WinOrder()
             opacity := opacity="" ? 255 : opacity
             if((style >> 24) = 0x94 || (style >> 24) = 0x95 && style!=0x95CF0000 || ((style >> 24) = 0x96 && style!=0x96CF0000 && style!=0x960B0000) || (style >> 24) = 0x9C)
                 continue
+            if(iName="Cherry Studio.exe")
+                continue
             
             window := {Hwnd: hwnd, Name: iName, PID: iPID, Rect: rect, Style: style, Size: size, Opacity: opacity, Level: A_Index}
             windowInfo .= iName "(" iPID ") --> " class "[" title "], "  hwnd ", " style "<" size ", " opacity ">, (" rect.X "," rect.Y "," rect.Width "," rect.Height ")" "`n"
@@ -893,20 +895,20 @@ try {
     if(classM="Progman") {
         if(classA="Progman" || classA="Shell_TrayWnd")
             return
-        Loop, % Order.MaxIndex()
-        {
-            win:=Order[Order.MaxIndex()-A_Index+1]
-            hwnd:=win.Hwnd
-            if(A_Index<Order.MaxIndex()) {
-                if(WinCheckVisible(Order)>1) {
-                    WinSet, Transparent, 0, ahk_id %hwnd%
-                    WinSet, Disable,, ahk_id %hwnd%
-                } else {
-                    WinSet, Transparent, 255, ahk_id %hwnd%
-                    WinSet, Enable,, ahk_id %hwnd%
-                }
-            }
-        }
+        ; Loop, % Order.MaxIndex()
+        ; {
+        ;     win:=Order[Order.MaxIndex()-A_Index+1]
+        ;     hwnd:=win.Hwnd
+        ;     if(A_Index<Order.MaxIndex()) {
+        ;         if(WinCheckVisible(Order)>1) {
+        ;             WinSet, Transparent, 0, ahk_id %hwnd%
+        ;             WinSet, Disable,, ahk_id %hwnd%
+        ;         } else {
+        ;             WinSet, Transparent, 255, ahk_id %hwnd%
+        ;             WinSet, Enable,, ahk_id %hwnd%
+        ;         }
+        ;     }
+        ; }
     } else if(classM="Shell_TrayWnd") {
         if(MouseTrayLeft()) {
             switch WinCheckType(Order) {
@@ -928,7 +930,7 @@ try {
         WinSet, Enable,, ahk_id %hwndA%
     } else if(hwndA=hwndM) {
         if(Order[1].Size=0) {
-            ;WinShowList(WinGetNorm(Order))
+            WinShowList(WinGetNorm(Order))
             WinHideList(WinGetMax(Order))
         }
         if(Order[1].Size=1) {
@@ -996,7 +998,7 @@ try {
         }
     } else if(hwndA=hwndM) {
         if(Order[1].Size=0) {
-            ;WinShowList(WinGetNorm(Order))
+            WinShowList(WinGetNorm(Order))
             WinHideList(WinGetMax(Order))
         }
         if(Order[1].Size=1) {
